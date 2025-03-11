@@ -7,9 +7,11 @@ The OpenAI Agents SDK is a lightweight yet powerful framework for building multi
 ### Core concepts:
 
 1. [**Agents**](https://openai.github.io/openai-agents-python/agents): LLMs configured with instructions, tools, guardrails, and handoffs
-2. [**Handoffs**](https://openai.github.io/openai-agents-python/handoffs/): Allow agents to transfer control to other agents for specific tasks
-3. [**Guardrails**](https://openai.github.io/openai-agents-python/guardrails/): Configurable safety checks for input and output validation
-4. [**Tracing**](https://openai.github.io/openai-agents-python/tracing/): Built-in tracking of agent runs, allowing you to view, debug and optimize your workflows
+2. [**Tools**](https://openai.github.io/openai-agents-python/tools/): Functions and capabilities that agents can use to accomplish tasks
+3. [**Handoffs**](https://openai.github.io/openai-agents-python/handoffs/): Allow agents to transfer control to other agents for specific tasks
+4. [**Guardrails**](https://openai.github.io/openai-agents-python/guardrails/): Configurable safety checks for input and output validation
+5. [**Tracing**](https://openai.github.io/openai-agents-python/tracing/): Built-in tracking of agent runs, allowing you to view, debug and optimize your workflows
+6. [**MCP Integration**](#model-context-protocol-mcp-integration): Connect agents to external tools and data sources using the Model Context Protocol
 
 Explore the [examples](examples) directory to see the SDK in action, and read our [documentation](https://openai.github.io/openai-agents-python/) for more details.
 
@@ -25,7 +27,8 @@ source env/bin/activate
 2. Install Agents SDK
 
 ```
-pip install openai-agents
+pip install openai-agents         # Basic installation
+pip install "openai-agents[mcp]"  # Install with MCP support
 ```
 
 ## Hello world example
@@ -135,6 +138,49 @@ As a result, the mental model for the agent loop is:
 ## Common agent patterns
 
 The Agents SDK is designed to be highly flexible, allowing you to model a wide range of LLM workflows including deterministic flows, iterative loops, and more. See examples in [`examples/agent_patterns`](examples/agent_patterns).
+
+## Model Context Protocol (MCP) Integration
+
+The Agents SDK seamlessly integrates with the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/), an open standard that connects LLMs to external tools and data sources.
+
+```python
+import asyncio
+import os
+from agents import Agent, RunConfig, Runner, ServerConfig
+
+# Create an agent that can use MCP tools
+assistant = Agent.from_prompt(
+    name="Weather Assistant",
+    prompt="You are a helpful weather assistant."
+)
+
+# Configure MCP server (a weather service in this example)
+weather_server = ServerConfig(
+    name="weather-service",
+    command="python",
+    args=["weather_server.py"]
+)
+
+# Create configuration with MCP tools
+config = RunConfig.with_mcp_tools(
+    servers=[weather_server],
+    model="gpt-4o",
+    anthropic_api_key=os.environ.get("ANTHROPIC_API_KEY")
+)
+
+async def main():
+    result = await Runner.run(
+        starting_agent=assistant,
+        input="What's the weather in New York?",
+        run_config=config
+    )
+    print(result.output)
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+For more examples of MCP integration, see the [`examples/mcp`](examples/mcp) directory.
 
 ## Tracing
 
