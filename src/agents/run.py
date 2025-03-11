@@ -102,6 +102,113 @@ class RunConfig:
     """
     An optional dictionary of additional metadata to include with the trace.
     """
+    
+    tools: list | None = None
+    """
+    A list of tools to make available to the agent. These tools will be added to any
+    tools defined on the agent itself.
+    """
+    
+    @classmethod
+    def with_mcp_tools(
+        cls,
+        *,
+        # Single server configuration
+        base_url: str | None = None,
+        api_key: str | None = None,
+        command: str | None = None,
+        args: list[str] | None = None,
+        env: dict[str, str] | None = None,
+        
+        # Multiple servers configuration
+        servers: list | None = None,
+        default_server: str | None = None,
+        
+        # Model configuration
+        model: str = "gpt-4-turbo",
+        model_provider: ModelProvider | None = None,
+        model_settings: ModelSettings | None = None,
+        
+        # Which servers to get tools from
+        include_servers: list[str] | None = None,
+        include_all_servers: bool = True,
+        
+        # Other parameters
+        anthropic_api_key: str | None = None,
+        tools: list | None = None,
+        **kwargs
+    ) -> "RunConfig":
+        """Create a RunConfig that includes tools from MCP servers.
+        
+        This method provides tools from MCP servers that can be used with any model.
+        
+        Args:
+            base_url: The base URL of the MCP HTTP server.
+            api_key: API key for authentication (if required).
+            command: Command to start the MCP stdio server.
+            args: Command line arguments for the stdio server.
+            env: Environment variables for the stdio server.
+            servers: List of server configurations for connecting to multiple MCP servers.
+            default_server: Name of the default server to use.
+            model: The model name to use (defaults to OpenAI's GPT-4).
+            model_provider: The model provider to use.
+            model_settings: Model-specific settings.
+            include_servers: List of server names to get tools from.
+            include_all_servers: Whether to include tools from all servers.
+            anthropic_api_key: API key for Anthropic (required for MCP).
+            tools: Additional tools to include alongside MCP tools.
+            **kwargs: Additional arguments to pass to RunConfig.
+        
+        Returns:
+            A RunConfig with tools from MCP servers.
+        """
+        from .models.mcp_model import MCPToolProvider, ServerConfig
+        
+        # Handle single vs multiple server configurations
+        if servers is None and (base_url is not None or command is not None):
+            # Single server configuration
+            server_name = default_server or "default"
+            config = ServerConfig(
+                name=server_name,
+                base_url=base_url,
+                api_key=api_key,
+                command=command,
+                args=args,
+                env=env
+            )
+            servers = [config]
+        
+        # Create provider with configured servers
+        provider = MCPToolProvider(
+            servers=servers,
+            default_server=default_server,
+            anthropic_api_key=anthropic_api_key
+        )
+        
+        # Get tools from specified servers
+        mcp_tools = []
+        if include_all_servers:
+            mcp_tools.extend(provider.get_all_tools())
+        elif include_servers:
+            for server_name in include_servers:
+                mcp_tools.extend(provider.get_tools_from_server(server_name))
+        else:
+            # Default to getting tools from the default server
+            mcp_tools.extend(provider.get_tools_from_server())
+        
+        # Add any existing tools
+        all_tools = []
+        if tools:
+            all_tools.extend(tools)
+        all_tools.extend(mcp_tools)
+        
+        return cls(
+            model=model,
+            model_provider=model_provider,
+            model_settings=model_settings,
+            tools=all_tools,
+            **kwargs
+        )
 
 
 class Runner:
